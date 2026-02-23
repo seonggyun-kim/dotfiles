@@ -1,0 +1,7 @@
+include "%L"
+
+include "~/.XCompose.local"
+
+# Put personal compose sequences in ~/.XCompose.local (not tracked in git).
+# Example:
+# <Multi_key> <e> <m> <a> <i> <l> : "you@example.com"
