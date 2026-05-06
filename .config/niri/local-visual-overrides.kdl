@@ -1,0 +1,25 @@
+// Local overrides loaded after DMS-generated includes.
+layout {
+    border {
+        off
+    }
+
+    focus-ring {
+        off
+    }
+
+    shadow {
+        on
+        softness 28
+        spread 8
+        offset x=0 y=0
+        color "#000000b0"
+    }
+}
+
+window-rule {
+    geometry-corner-radius 4
+    clip-to-geometry true
+    tiled-state true
+    draw-border-with-background false
+}

@@ -1,0 +1,230 @@
+// Niri config (KDL): https://kdl.dev
+// Full reference: https://github.com/YaLTeR/niri/wiki/Configuration:-Introduction
+
+// -----------------------------------------------------------------------------
+// Core behavior
+// -----------------------------------------------------------------------------
+config-notification {
+    disable-failed
+}
+
+gestures {
+    hot-corners {
+        off
+    }
+}
+
+// Reference output block (disabled). Real output settings come from dms/outputs.kdl.
+/-output "eDP-1" {
+    mode "1920x1200@240"
+    transform "normal"
+    position x=0 y=0
+}
+
+// -----------------------------------------------------------------------------
+// Input
+// -----------------------------------------------------------------------------
+input {
+    keyboard {
+        xkb {
+            options "compose:caps,shift:both_capslock"
+        }
+        numlock
+    }
+
+    touchpad {
+        tap
+        drag false
+        natural-scroll
+    }
+
+    mouse {}
+    trackpoint {}
+}
+
+// -----------------------------------------------------------------------------
+// Layout and visuals
+// -----------------------------------------------------------------------------
+layout {
+    background-color "transparent"
+    center-focused-column "never"
+
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+
+    default-column-width { proportion 0.5; }
+
+    border {
+        off
+        width 4
+        active-color   "#707070"
+        inactive-color "#d0d0d0"
+        urgent-color   "#cc4444"
+    }
+
+    struts {}
+}
+
+layer-rule {
+    match namespace="^quickshell$"
+    place-within-backdrop true
+}
+
+overview {
+    workspace-shadow {
+        off
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Environment and startup
+// -----------------------------------------------------------------------------
+environment {
+    XDG_CURRENT_DESKTOP "niri"
+    GTK_IM_MODULE "fcitx"
+    QT_IM_MODULE "fcitx"
+    XMODIFIERS "@im=fcitx"
+    SDL_IM_MODULE "fcitx"
+    GLFW_IM_MODULE "fcitx"
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+prefer-no-csd
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+
+animations {
+    workspace-switch {
+        spring damping-ratio=0.80 stiffness=523 epsilon=0.0001
+    }
+    window-open {
+        duration-ms 150
+        curve "ease-out-expo"
+    }
+    window-close {
+        duration-ms 150
+        curve "ease-out-quad"
+    }
+    horizontal-view-movement {
+        spring damping-ratio=0.85 stiffness=423 epsilon=0.0001
+    }
+    window-movement {
+        spring damping-ratio=0.75 stiffness=323 epsilon=0.0001
+    }
+    window-resize {
+        spring damping-ratio=0.85 stiffness=423 epsilon=0.0001
+    }
+    config-notification-open-close {
+        spring damping-ratio=0.65 stiffness=923 epsilon=0.001
+    }
+    screenshot-ui-open {
+        duration-ms 200
+        curve "ease-out-quad"
+    }
+    overview-open-close {
+        spring damping-ratio=0.85 stiffness=800 epsilon=0.0001
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Window rules
+// -----------------------------------------------------------------------------
+window-rule {
+    match app-id=r#"^org\.wezfurlong\.wezterm$"#
+    default-column-width {}
+}
+
+window-rule {
+    match app-id=r#"^org\.gnome\."#
+    draw-border-with-background false
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
+
+window-rule {
+    match app-id=r#"^gnome-control-center$"#
+    match app-id=r#"^pavucontrol$"#
+    match app-id=r#"^nm-connection-editor$"#
+    default-column-width { proportion 0.5; }
+    open-floating false
+}
+
+window-rule {
+    match app-id=r#"^gnome-calculator$"#
+    match app-id=r#"^galculator$"#
+    match app-id=r#"^blueman-manager$"#
+    match app-id=r#"^org\.gnome\.Nautilus$"#
+    match app-id=r#"^steam$"#
+    match app-id=r#"^xdg-desktop-portal$"#
+    open-floating false
+}
+
+window-rule {
+    match app-id=r#"^org\.wezfurlong\.wezterm$"#
+    match app-id="Alacritty"
+    match app-id="zen"
+    match app-id="com.mitchellh.ghostty"
+    match app-id="kitty"
+    draw-border-with-background false
+}
+
+window-rule {
+    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+    match app-id="zoom"
+    open-floating true
+}
+
+window-rule {
+    match app-id=r#"org.quickshell$"#
+    open-floating true
+    shadow {
+        off
+    }
+}
+
+window-rule {
+    match is-focused=false
+    background-effect {
+        blur true
+    }
+    opacity 0.75
+}
+
+debug {
+    honor-xdg-activation-with-invalid-serial
+}
+
+// -----------------------------------------------------------------------------
+// Keybindings
+// -----------------------------------------------------------------------------
+recent-windows {
+    binds {
+        Alt+Tab         { next-window scope="output"; }
+        Alt+Shift+Tab   { previous-window scope="output"; }
+        Alt+grave       { next-window filter="app-id"; }
+        Alt+Shift+grave { previous-window filter="app-id"; }
+    }
+}
+
+binds {
+    Mod+Shift+D hotkey-overlay-title="Toggle Dark/Light Mode" { spawn "dms" "ipc" "call" "theme" "toggle"; }
+}
+
+// -----------------------------------------------------------------------------
+// DMS includes (auto-generated modules)
+// -----------------------------------------------------------------------------
+include "dms/colors.kdl"
+include "dms/layout.kdl"
+include "dms/alttab.kdl"
+include "dms/binds.kdl"
+include "dms/outputs.kdl"
+include "dms/cursor.kdl"
+include "dms/windowrules.kdl"
+
+// Local overrides must come after DMS-generated includes.
+include "local-visual-overrides.kdl"

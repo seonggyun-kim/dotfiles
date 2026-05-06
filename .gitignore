@@ -1,3 +1,16 @@
 .XCompose.local
 .zshrc.local
 .zprofile.local
+
+# Default-deny dotfiles repo. Unignore only explicit tracked paths.
+*
+
+!.gitignore
+!.config/
+!.config/niri/
+!.config/niri/config.kdl
+!.config/niri/local-visual-overrides.kdl
+!.config/niri/dms/
+!.config/niri/dms/*.kdl
+!.config/niri/dms/profiles/
+!.config/niri/dms/profiles/*.kdl
