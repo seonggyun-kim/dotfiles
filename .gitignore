@@ -6,7 +6,17 @@
 *
 
 !.gitignore
+!.XCompose
+!.zshrc
+!README.md
+!install.sh
+
 !.config/
+!.config/alacritty/
+!.config/alacritty/*.toml
+!.config/fontconfig/
+!.config/fontconfig/conf.d/
+!.config/fontconfig/conf.d/*.conf
 !.config/niri/
 !.config/niri/config.kdl
 !.config/niri/local-visual-overrides.kdl
@@ -14,3 +24,12 @@
 !.config/niri/dms/*.kdl
 !.config/niri/dms/profiles/
 !.config/niri/dms/profiles/*.kdl
+!.config/nvim/
+!.config/nvim/init.lua
+!.config/nvim/nvim-pack-lock.json
+!.config/nvim/lua/
+!.config/nvim/lua/*.lua
+!.config/nvim/lua/plugins/
+!.config/nvim/lua/plugins/*.lua
+!.config/tmux/
+!.config/tmux/tmux.conf

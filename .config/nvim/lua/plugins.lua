@@ -54,7 +54,35 @@ vim.api.nvim_set_hl(0, 'FloatBorder', { bg = 'none' })
 ----------------------------------------------------------------
 -- Oil (file explorer)
 ----------------------------------------------------------------
-require("oil").setup({
+local oil = require("oil")
+local oil_actions = require("oil.actions")
+
+local function oil_select_with_pdf_opener()
+  local entry = oil.get_cursor_entry()
+  local dir = oil.get_current_dir()
+
+  if not entry or not dir then
+    return
+  end
+
+  if entry.type == "directory" or not entry.name:lower():match("%.pdf$") then
+    oil_actions.select.callback()
+    return
+  end
+
+  if vim.w.is_oil_win then
+    oil_actions.close.callback()
+  end
+
+  local path = vim.fn.fnamemodify(dir .. entry.name, ":p")
+  local jid = vim.fn.jobstart({ "zathura", path }, { detach = true })
+
+  if jid <= 0 then
+    vim.notify("Failed to open PDF in zathura: " .. path, vim.log.levels.ERROR)
+  end
+end
+
+oil.setup({
   view_options = { show_hidden = true },
   float = {
     padding = 2,
@@ -63,6 +91,11 @@ require("oil").setup({
     border = "rounded",
   },
   keymaps = {
+    ["<CR>"] = {
+      callback = oil_select_with_pdf_opener,
+      desc = "Open PDFs in zathura, otherwise select",
+      mode = "n",
+    },
     ["<C-c>"] = "actions.close",
     ["<C-h>"] = false,
     ["<C-l>"] = false,
