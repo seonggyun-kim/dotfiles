@@ -88,7 +88,7 @@ alias vim=nvim
 if (( $+commands[fastfetch] )); then
   fastfetch() {
     case "${1:-}" in
-      ''|--refresh-cache|--refresh-logo-cache|--cache-path)
+      ''|--refresh-cache|--cache-path)
         if [[ -x "$HOME/.local/bin/dotfiles-fastfetch" ]]; then
           "$HOME/.local/bin/dotfiles-fastfetch" "$@"
           return
