@@ -10,6 +10,8 @@ fi
 
 refresh_cache=0
 print_cache_path=0
+tty_state=''
+temp_dir=''
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -36,6 +38,25 @@ if [[ ! -t 1 && "${DOTFILES_FASTFETCH_FORCE:-0}" != "1" \
   exec "${real_fastfetch}"
 fi
 
+flush_tty_input() {
+  perl -MPOSIX=tcflush,TCIFLUSH -e 'tcflush(0, TCIFLUSH)' 2>/dev/null || true
+}
+
+restore_tty() {
+  if [[ -n "${tty_state}" ]]; then
+    flush_tty_input
+    stty "${tty_state}" 2>/dev/null || true
+  fi
+}
+
+cleanup() {
+  if [[ -n "${temp_dir}" ]]; then
+    rm -rf "${temp_dir}"
+  fi
+
+  restore_tty
+}
+
 host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
 host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
@@ -51,8 +72,21 @@ if [[ "${print_cache_path}" -eq 1 ]]; then
   exit 0
 fi
 
+trap cleanup EXIT INT TERM
+
+if [[ -t 0 && -t 1 ]]; then
+  tty_state="$(stty -g 2>/dev/null || true)"
+  if [[ -n "${tty_state}" ]]; then
+    stty -echo 2>/dev/null || true
+  fi
+fi
+
 run_fastfetch() {
-  exec "${real_fastfetch}" --pipe false --logo-type file --logo "$1"
+  local exit_status
+
+  "${real_fastfetch}" --pipe false --logo-type file --logo "$1"
+  exit_status=$?
+  exit "${exit_status}"
 }
 
 if [[ "${refresh_cache}" -eq 0 && -s "${cache_file}" ]]; then
@@ -60,11 +94,6 @@ if [[ "${refresh_cache}" -eq 0 && -s "${cache_file}" ]]; then
 fi
 
 temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-fastfetch.XXXXXX")"
-cleanup() {
-  rm -rf "${temp_dir}"
-}
-trap cleanup EXIT
-
 logo_config="${temp_dir}/logo.jsonc"
 logo_file="${temp_dir}/logo.txt"
 banner_file="${temp_dir}/banner.txt"

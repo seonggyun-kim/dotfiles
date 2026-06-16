@@ -119,40 +119,19 @@ autoload -Uz add-zsh-hook
 dotfiles_git_prompt_status() {
   command git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
-  local branch dirty
-  branch="$(command git symbolic-ref --quiet --short HEAD 2>/dev/null \
-    || command git rev-parse --short HEAD 2>/dev/null)" || return 0
-
-  [[ -n "$(command git status --porcelain 2>/dev/null)" ]] && dirty=" *"
-  printf '%s%s' "${branch//\%/%%}" "${dirty}"
+  [[ -n "$(command git status --porcelain 2>/dev/null)" ]] && printf ' *'
 }
 
 dotfiles_prompt_precmd() {
-  local prompt_user prompt_host prompt_path left_width right_width git_status terminal_width gap_width gap right_prompt
+  local git_status
   local host_color normal_color
 
   [[ -n "${DOTFILES_DISABLE_PROMPT:-}" ]] && return 0
 
   host_color=$'%{\e[38;2;136;192;208m%}'
   normal_color=$'%{\e[39m%}'
-  prompt_user="${(%):-%n}"
-  prompt_host="${(%):-%m}"
-  prompt_path="${(%):-%~}"
-  left_width=$(( ${#prompt_user} + 1 + ${#prompt_host} ))
   git_status="$(dotfiles_git_prompt_status)"
-  right_prompt="%~"
-  right_width="${#prompt_path}"
-  if [[ -n "${git_status}" ]]; then
-    right_prompt+=" ${git_status}"
-    right_width=$(( right_width + 1 + ${#git_status} ))
-  fi
-  terminal_width="${COLUMNS:-80}"
-  (( terminal_width > 0 )) || terminal_width=80
-
-  gap_width=$(( terminal_width - left_width - right_width ))
-  (( gap_width < 1 )) && gap_width=1
-  gap="${(pl:${gap_width}:: :)}"
-  PROMPT=$'\n'"%B%n@${host_color}%m${normal_color}%b${gap}${right_prompt}"$'\n'"%# "
+  PROMPT=$'\n'"%B%n@${host_color}%m${normal_color}%b %~${git_status}"$'\n'"%# "
 }
 
 add-zsh-hook -d precmd dotfiles_prompt_precmd 2>/dev/null || true
