@@ -122,9 +122,9 @@ dotfiles_prompt_precmd() {
     gap_width=$(( terminal_width - left_width - ${#git_status} ))
     (( gap_width < 1 )) && gap_width=1
     gap="${(pl:${gap_width}:: :)}"
-    PROMPT="%B%n@%F{#88c0d0}%m%f%b${gap}${git_status}"$'\n'"%# "
+    PROMPT=$'\n'"%B%n@%F{#88c0d0}%m%f%b${gap}${git_status}"$'\n'"%# "
   else
-    PROMPT="%B%n@%F{#88c0d0}%m%f%b"$'\n'"%# "
+    PROMPT=$'\n'"%B%n@%F{#88c0d0}%m%f%b"$'\n'"%# "
   fi
 }
 
