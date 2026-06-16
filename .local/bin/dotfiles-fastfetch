@@ -35,9 +35,10 @@ host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
 host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 figlet_font="${DOTFILES_FASTFETCH_FIGLET_FONT:-big}"
+cache_version="v2"
 
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
-cache_key="$(printf '%s-%s' "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
+cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
 cache_file="${cache_dir}/${cache_key}.logo"
 
 if [[ "${print_cache_path}" -eq 1 ]]; then
@@ -96,6 +97,13 @@ strip_ansi() {
 visible_width() {
   local stripped
   stripped="$(printf '%s' "$1" | strip_ansi)"
+  printf '%s\n' "${#stripped}"
+}
+
+visible_content_width() {
+  local stripped
+  stripped="$(printf '%s' "$1" | strip_ansi)"
+  stripped="${stripped//[[:space:]]/}"
   printf '%s\n' "${#stripped}"
 }
 
@@ -223,6 +231,18 @@ line=''
 while IFS= read -r line || [[ -n "${line}" ]]; do
   logo_lines+=("${line}")
 done <"${logo_file}"
+
+last_logo_line="${#logo_lines[@]}"
+while (( last_logo_line > 0 )); do
+  if (( "$(visible_content_width "${logo_lines[$last_logo_line]}")" > 0 )); then
+    break
+  fi
+  last_logo_line=$((last_logo_line - 1))
+done
+
+if (( last_logo_line < ${#logo_lines[@]} )); then
+  logo_lines=("${logo_lines[@]:0:${last_logo_line}}")
+fi
 
 typeset -a banner_lines
 banner_lines=()
