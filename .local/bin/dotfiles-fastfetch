@@ -35,7 +35,7 @@ host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
 host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 figlet_font="${DOTFILES_FASTFETCH_FIGLET_FONT:-big}"
-cache_version="v3"
+cache_version="v4"
 
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
 cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
@@ -204,25 +204,11 @@ ansi_slice_line() {
   printf '%s' "${output}"
 }
 
-logo_cell() {
-  local logo_line="$1"
-  local col="$2"
-  local cell cell_width
-
-  cell="$(ansi_slice_line "${logo_line}" "${col}" "$((col + 1))")"
-  cell_width="$(visible_width "${cell}")"
-  if (( cell_width == 0 )); then
-    printf ' '
-  else
-    printf '%s' "${cell}"
-  fi
-}
-
 overlay_banner_row() {
   local logo_line="$1"
   local banner_row="$2"
   local banner_line="$3"
-  local output left_width banner_col canvas_col ch key row_first row_last
+  local output left_width banner_col ch key row_first row_last
 
   output="$(ansi_slice_line "${logo_line}" 0 "${banner_start_col}")"
   left_width="$(visible_width "${output}")"
@@ -231,7 +217,6 @@ overlay_banner_row() {
   fi
 
   for ((banner_col = 0; banner_col < banner_width; banner_col++)); do
-    canvas_col=$((banner_start_col + banner_col))
     if (( banner_col < ${#banner_line} )); then
       ch="${banner_line[$((banner_col + 1))]}"
     else
@@ -245,7 +230,7 @@ overlay_banner_row() {
       if (( ${+banner_fill[$key]} || (row_first >= 0 && banner_col >= row_first && banner_col <= row_last) )); then
         output+=' '
       else
-        output+="$(logo_cell "${logo_line}" "${canvas_col}")"
+        output+=' '
       fi
     else
       output+="${ch}"
@@ -281,6 +266,38 @@ line=''
 while IFS= read -r line || [[ -n "${line}" ]]; do
   banner_lines+=("${line}")
 done <"${banner_file}"
+
+banner_min_col=-1
+banner_max_col=-1
+for line in "${banner_lines[@]}"; do
+  read -r content_start content_end <<<"$(line_content_bounds "${line}")"
+  if (( content_start >= 0 )); then
+    if (( banner_min_col < 0 || content_start < banner_min_col )); then
+      banner_min_col="${content_start}"
+    fi
+    if (( content_end > banner_max_col )); then
+      banner_max_col="${content_end}"
+    fi
+  fi
+done
+
+if (( banner_min_col > 0 )); then
+  for ((i = 1; i <= ${#banner_lines[@]}; i++)); do
+    banner_lines[$i]="${banner_lines[$i]:${banner_min_col}:$((banner_max_col - banner_min_col))}"
+  done
+fi
+
+last_banner_line="${#banner_lines[@]}"
+while (( last_banner_line > 0 )); do
+  if (( "$(visible_content_width "${banner_lines[$last_banner_line]}")" > 0 )); then
+    break
+  fi
+  last_banner_line=$((last_banner_line - 1))
+done
+
+if (( last_banner_line < ${#banner_lines[@]} )); then
+  banner_lines=("${banner_lines[@]:0:${last_banner_line}}")
+fi
 
 logo_width=0
 typeset -a logo_centers
