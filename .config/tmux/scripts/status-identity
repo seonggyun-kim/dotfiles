@@ -3,7 +3,7 @@ set -euo pipefail
 
 normal_fg="${1:-#D8DEE9}"
 host_fg="${2:-magenta}"
-root_host_fg="${3:-colour208}"
+root_host_fg="${3:-colour220}"
 
 user="${USER:-}"
 if [[ -z "${user}" ]]; then
