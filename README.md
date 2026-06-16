@@ -35,7 +35,7 @@ The installer creates symlinks into `$HOME` and backs up existing files to:
 
 It also installs the tmux plugins declared in `.config/tmux/tmux.conf` through TPM when `git` and `tmux` are available. The CPU/MEM status plugin needs `python3`, `python3-venv`, and network access to install its Python dependency.
 
-It installs `figlet` when `apt-get`, `pacman`, or `brew` is available. The interactive zsh `fastfetch` command uses the `big` font to overlay a hostname banner onto the default OS logo while preserving the normal fastfetch info list config. Set `DOTFILES_FASTFETCH_FIGLET_FONT` to try a different font.
+It installs `figlet` when `apt-get`, `pacman`, or `brew` is available. The interactive zsh `fastfetch` command uses the `big` font to overlay a hostname banner onto the default OS logo while preserving the normal fastfetch info list config. The composed logo is cached under `${XDG_CACHE_HOME:-~/.cache}/dotfiles/fastfetch`; first use builds it, normal runs reuse it, and `fastfetch --refresh-cache` rebuilds it.
 
 ## OS compatibility
 

@@ -9,12 +9,44 @@ if [[ -z "${real_fastfetch}" ]]; then
   exit 127
 fi
 
+refresh_cache=0
+print_cache_path=0
+
+case "${1:-}" in
+  --refresh-cache|--refresh-logo-cache)
+    refresh_cache=1
+    shift
+    ;;
+  --cache-path)
+    print_cache_path=1
+    shift
+    ;;
+esac
+
 if [[ $# -gt 0 ]]; then
   exec "${real_fastfetch}" "$@"
 fi
 
-if [[ ! -t 1 && "${DOTFILES_FASTFETCH_FORCE:-0}" != "1" ]]; then
+if [[ ! -t 1 && "${DOTFILES_FASTFETCH_FORCE:-0}" != "1" && "${refresh_cache}" -ne 1 && "${print_cache_path}" -ne 1 ]]; then
   exec "${real_fastfetch}"
+fi
+
+host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
+host_name="${host_name%%.*}"
+host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
+figlet_font="${DOTFILES_FASTFETCH_FIGLET_FONT:-big}"
+
+cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
+cache_key="$(printf '%s-%s' "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
+cache_file="${cache_dir}/${cache_key}.logo"
+
+if [[ "${print_cache_path}" -eq 1 ]]; then
+  printf '%s\n' "${cache_file}"
+  exit 0
+fi
+
+if [[ "${refresh_cache}" -ne 1 && -s "${cache_file}" ]]; then
+  exec "${real_fastfetch}" --logo-type file-raw --logo "${cache_file}"
 fi
 
 temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-fastfetch.XXXXXX")"
@@ -49,12 +81,7 @@ if [[ ! -s "${logo_file}" ]]; then
   exit $?
 fi
 
-host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
-host_name="${host_name%%.*}"
-host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
-
 if (( $+commands[figlet] )); then
-  figlet_font="${DOTFILES_FASTFETCH_FIGLET_FONT:-big}"
   if ! figlet -f "${figlet_font}" "${host_name}" >"${banner_file}" 2>/dev/null; then
     figlet "${host_name}" >"${banner_file}"
   fi
@@ -355,4 +382,13 @@ done
   done
 } >"${composed_logo}"
 
-"${real_fastfetch}" --logo-type file-raw --logo "${composed_logo}"
+mkdir -p "${cache_dir}"
+cache_tmp="${cache_file}.${$}.tmp"
+cp "${composed_logo}" "${cache_tmp}"
+mv "${cache_tmp}" "${cache_file}"
+
+if [[ "${refresh_cache}" -eq 1 ]]; then
+  printf 'refreshed fastfetch logo cache: %s\n' "${cache_file}" >&2
+fi
+
+exec "${real_fastfetch}" --logo-type file-raw --logo "${cache_file}"

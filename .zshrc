@@ -2,45 +2,53 @@
 export PATH="/usr/local/texlive/2025/bin/x86_64-linux:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
-### Added by Zinit's installer
-if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
+if [[ -z "${DOTFILES_ZINIT_LOADED:-}" ]] && (( ! ${+functions[_zsh_autosuggest_start]} )); then
+  ### Added by Zinit's installer
+  if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
     print -P "%F{33} %F{220}Installing %F{33}ZDHARMA-CONTINUUM%F{220} Initiative Plugin Manager (%F{33}zdharma-continuum/zinit%F{220})…%f"
     command mkdir -p "$HOME/.local/share/zinit" && command chmod g-rwX "$HOME/.local/share/zinit"
     command git clone https://github.com/zdharma-continuum/zinit "$HOME/.local/share/zinit/zinit.git" && \
         print -P "%F{33} %F{34}Installation successful.%f%b" || \
         print -P "%F{160} The clone has failed.%f%b"
+  fi
+
+  if [[ -f "$HOME/.local/share/zinit/zinit.git/zinit.zsh" ]]; then
+    source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
+    autoload -Uz _zinit
+    (( ${+_comps} )) && _comps[zinit]=_zinit
+
+    # Load a few important annexes, without Turbo
+    # (this is currently required for annexes)
+    zinit light-mode for \
+        zdharma-continuum/zinit-annex-as-monitor \
+        zdharma-continuum/zinit-annex-bin-gem-node \
+        zdharma-continuum/zinit-annex-patch-dl \
+        zdharma-continuum/zinit-annex-rust
+
+    ### End of Zinit's installer chunk
+    ## ---- zinit ----
+    # source ~/.zinit/bin/zinit.zsh
+    #
+    # fast syntax highlighting (minimal, not flashy)
+    zinit light zdharma-continuum/fast-syntax-highlighting
+
+    # autosuggestions (subtle, fish-like)
+    zinit light zsh-users/zsh-autosuggestions
+
+    # smarter tab completion
+    zinit light zsh-users/zsh-completions
+
+    # history substring search (↑ ↓ actually useful)
+    zinit light zsh-users/zsh-history-substring-search
+    # history substring search bindings
+    bindkey '^[[A' history-substring-search-up
+    bindkey '^[[B' history-substring-search-down
+
+    export DOTFILES_ZINIT_LOADED=1
+  fi
+else
+  export DOTFILES_ZINIT_LOADED=1
 fi
-
-source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
-autoload -Uz _zinit
-(( ${+_comps} )) && _comps[zinit]=_zinit
-
-# Load a few important annexes, without Turbo
-# (this is currently required for annexes)
-zinit light-mode for \
-    zdharma-continuum/zinit-annex-as-monitor \
-    zdharma-continuum/zinit-annex-bin-gem-node \
-    zdharma-continuum/zinit-annex-patch-dl \
-    zdharma-continuum/zinit-annex-rust
-
-### End of Zinit's installer chunk
-## ---- zinit ----
-# source ~/.zinit/bin/zinit.zsh
-#
-# fast syntax highlighting (minimal, not flashy)
-zinit light zdharma-continuum/fast-syntax-highlighting
-
-# autosuggestions (subtle, fish-like)
-zinit light zsh-users/zsh-autosuggestions
-
-# smarter tab completion
-zinit light zsh-users/zsh-completions
-
-# history substring search (↑ ↓ actually useful)
-zinit light zsh-users/zsh-history-substring-search
-# history substring search bindings
-bindkey '^[[A' history-substring-search-up
-bindkey '^[[B' history-substring-search-down
 
 alias zshconfig='nvim ~/.zshrc'
 alias nvimconfig='nvim ~/.config/nvim/init.lua'
@@ -79,11 +87,16 @@ alias vim=nvim
 
 if (( $+commands[fastfetch] )); then
   fastfetch() {
-    if (( $# == 0 )) && [[ -x "$HOME/.local/bin/dotfiles-fastfetch" ]]; then
-      "$HOME/.local/bin/dotfiles-fastfetch"
-    else
-      command fastfetch "$@"
-    fi
+    case "${1:-}" in
+      ''|--refresh-cache|--refresh-logo-cache|--cache-path)
+        if [[ -x "$HOME/.local/bin/dotfiles-fastfetch" ]]; then
+          "$HOME/.local/bin/dotfiles-fastfetch" "$@"
+          return
+        fi
+        ;;
+    esac
+
+    command fastfetch "$@"
   }
 
   fastfetch 2>/dev/null || true
@@ -142,6 +155,7 @@ dotfiles_prompt_precmd() {
   PROMPT=$'\n'"%B%n@${host_color}%m${normal_color}%b${gap}${right_prompt}"$'\n'"%# "
 }
 
+add-zsh-hook -d precmd dotfiles_prompt_precmd 2>/dev/null || true
 add-zsh-hook precmd dotfiles_prompt_precmd
 
 # Optional machine-local overrides (not tracked in git).
