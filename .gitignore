@@ -11,6 +11,10 @@
 !README.md
 !install.sh
 
+!.local/
+!.local/bin/
+!.local/bin/dotfiles-fastfetch
+
 !.config/
 !.config/alacritty/
 !.config/alacritty/*.toml

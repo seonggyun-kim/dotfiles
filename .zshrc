@@ -77,8 +77,16 @@ alias vim=nvim
 # fi
 # # ----------------------------------
 
-if command -v fastfetch >/dev/null 2>&1; then
-    fastfetch 2>/dev/null || true
+if (( $+commands[fastfetch] )); then
+  fastfetch() {
+    if (( $# == 0 )) && [[ -x "$HOME/.local/bin/dotfiles-fastfetch" ]]; then
+      "$HOME/.local/bin/dotfiles-fastfetch"
+    else
+      command fastfetch "$@"
+    fi
+  }
+
+  fastfetch 2>/dev/null || true
 fi
 
 ssh() {

@@ -1,0 +1,358 @@
+#!/usr/bin/env zsh
+emulate -L zsh
+setopt err_exit pipe_fail no_unset
+
+real_fastfetch="${commands[fastfetch]:-}"
+
+if [[ -z "${real_fastfetch}" ]]; then
+  printf 'dotfiles-fastfetch: fastfetch is required\n' >&2
+  exit 127
+fi
+
+if [[ $# -gt 0 ]]; then
+  exec "${real_fastfetch}" "$@"
+fi
+
+if [[ ! -t 1 && "${DOTFILES_FASTFETCH_FORCE:-0}" != "1" ]]; then
+  exec "${real_fastfetch}"
+fi
+
+temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-fastfetch.XXXXXX")"
+cleanup() {
+  rm -rf "${temp_dir}"
+}
+trap cleanup EXIT
+
+logo_config="${temp_dir}/logo.jsonc"
+logo_file="${temp_dir}/logo.txt"
+banner_file="${temp_dir}/banner.txt"
+composed_logo="${temp_dir}/composed-logo.txt"
+
+cat >"${logo_config}" <<'EOF'
+{
+  "modules": [
+    {
+      "type": "logo",
+      "only": true
+    }
+  ]
+}
+EOF
+
+if ! "${real_fastfetch}" --config "${logo_config}" --pipe false >"${logo_file}" 2>/dev/null; then
+  "${real_fastfetch}"
+  exit $?
+fi
+
+if [[ ! -s "${logo_file}" ]]; then
+  "${real_fastfetch}"
+  exit $?
+fi
+
+host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
+host_name="${host_name%%.*}"
+host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
+
+if (( $+commands[figlet] )); then
+  figlet_font="${DOTFILES_FASTFETCH_FIGLET_FONT:-big}"
+  if ! figlet -f "${figlet_font}" "${host_name}" >"${banner_file}" 2>/dev/null; then
+    figlet "${host_name}" >"${banner_file}"
+  fi
+else
+  printf '%s\n' "${host_name}" >"${banner_file}"
+fi
+
+strip_ansi() {
+  sed -E $'s/\x1b\\[[0-9;?]*[ -/]*[@-~]//g'
+}
+
+visible_width() {
+  local stripped
+  stripped="$(printf '%s' "$1" | strip_ansi)"
+  printf '%s\n' "${#stripped}"
+}
+
+repeat_spaces() {
+  local count="$1"
+
+  if (( count > 0 )); then
+    printf '%*s' "${count}" ''
+  fi
+}
+
+ansi_slice_line() {
+  local line="$1"
+  local start_col="$2"
+  local end_col="$3"
+  local idx=1
+  local length="${#line}"
+  local visible_col=0
+  local output=''
+  local active_sgr=''
+  local ch seq
+
+  while (( idx <= length )); do
+    ch="${line[$idx]}"
+
+    if [[ "${ch}" == $'\e' && "${line[$((idx + 1))]:-}" == '[' ]]; then
+      seq=$'\e['
+      idx=$((idx + 2))
+
+      while (( idx <= length )); do
+        ch="${line[$idx]}"
+        seq+="${ch}"
+        if [[ "${ch}" == [@-~] ]]; then
+          break
+        fi
+        idx=$((idx + 1))
+      done
+
+      if [[ "${seq}" == *m ]]; then
+        if [[ "${seq}" == $'\e[m' || "${seq}" == $'\e[0m' ]]; then
+          active_sgr=''
+        else
+          active_sgr+="${seq}"
+        fi
+      fi
+
+      if (( visible_col >= start_col && visible_col < end_col )); then
+        output+="${seq}"
+      fi
+    else
+      if (( visible_col >= start_col && visible_col < end_col )); then
+        if [[ -z "${output}" && -n "${active_sgr}" ]]; then
+          output+="${active_sgr}"
+        fi
+        output+="${ch}"
+      fi
+      visible_col=$((visible_col + 1))
+    fi
+
+    idx=$((idx + 1))
+  done
+
+  if [[ -n "${output}" ]]; then
+    output+=$'\e[m'
+  fi
+
+  printf '%s' "${output}"
+}
+
+logo_cell() {
+  local logo_line="$1"
+  local col="$2"
+  local cell cell_width
+
+  cell="$(ansi_slice_line "${logo_line}" "${col}" "$((col + 1))")"
+  cell_width="$(visible_width "${cell}")"
+  if (( cell_width == 0 )); then
+    printf ' '
+  else
+    printf '%s' "${cell}"
+  fi
+}
+
+overlay_banner_row() {
+  local logo_line="$1"
+  local banner_row="$2"
+  local banner_line="$3"
+  local output left_width banner_col canvas_col ch key row_first row_last
+
+  output="$(ansi_slice_line "${logo_line}" 0 "${banner_start_col}")"
+  left_width="$(visible_width "${output}")"
+  if (( left_width < banner_start_col )); then
+    output+="$(repeat_spaces "$((banner_start_col - left_width))")"
+  fi
+
+  for ((banner_col = 0; banner_col < banner_width; banner_col++)); do
+    canvas_col=$((banner_start_col + banner_col))
+    if (( banner_col < ${#banner_line} )); then
+      ch="${banner_line[$((banner_col + 1))]}"
+    else
+      ch=' '
+    fi
+
+    if [[ "${ch}" == ' ' ]]; then
+      key="${banner_row},${banner_col}"
+      row_first="${banner_first_solid[$banner_row]:--1}"
+      row_last="${banner_last_solid[$banner_row]:--1}"
+      if (( ${+banner_fill[$key]} || (row_first >= 0 && banner_col >= row_first && banner_col <= row_last) )); then
+        output+=' '
+      else
+        output+="$(logo_cell "${logo_line}" "${canvas_col}")"
+      fi
+    else
+      output+="${ch}"
+    fi
+  done
+
+  output+="$(ansi_slice_line "${logo_line}" "$((banner_start_col + banner_width))" 2147483647)"
+  printf '%s\n' "${output}"
+}
+
+typeset -a logo_lines
+logo_lines=()
+line=''
+while IFS= read -r line || [[ -n "${line}" ]]; do
+  logo_lines+=("${line}")
+done <"${logo_file}"
+
+typeset -a banner_lines
+banner_lines=()
+line=''
+while IFS= read -r line || [[ -n "${line}" ]]; do
+  banner_lines+=("${line}")
+done <"${banner_file}"
+
+logo_width=0
+for line in "${logo_lines[@]}"; do
+  line_width="$(visible_width "${line}")"
+  if (( line_width > logo_width )); then
+    logo_width="${line_width}"
+  fi
+done
+
+banner_width=0
+for line in "${banner_lines[@]}"; do
+  line_width="$(visible_width "${line}")"
+  if (( line_width > banner_width )); then
+    banner_width="${line_width}"
+  fi
+done
+
+if (( banner_width > logo_width )); then
+  logo_width="${banner_width}"
+fi
+
+typeset -A banner_solid banner_exterior banner_fill
+typeset -a banner_first_solid banner_last_solid
+typeset -a queue_rows queue_cols
+
+mark_exterior_space() {
+  local row="$1"
+  local col="$2"
+  local key="${row},${col}"
+
+  if (( row < 1 || row > banner_height || col < 0 || col >= banner_width )); then
+    return 0
+  fi
+
+  if (( ${+banner_solid[$key]} || ${+banner_exterior[$key]} )); then
+    return 0
+  fi
+
+  banner_exterior[$key]=1
+  queue_rows+=("${row}")
+  queue_cols+=("${col}")
+}
+
+logo_height="${#logo_lines[@]}"
+banner_height="${#banner_lines[@]}"
+canvas_height="${logo_height}"
+if (( banner_height > canvas_height )); then
+  canvas_height="${banner_height}"
+fi
+
+vertical_offset=$(( (canvas_height - banner_height) / 2 ))
+if (( canvas_height % 2 == 1 && (canvas_height - banner_height) % 2 == 0 && vertical_offset > 0 )); then
+  vertical_offset=$((vertical_offset - 1))
+fi
+banner_start_row=$(( vertical_offset + 1 ))
+if (( banner_start_row < 1 )); then
+  banner_start_row=1
+fi
+
+banner_start_col=$(( (logo_width - banner_width) / 2 ))
+if (( banner_start_col < 0 )); then
+  banner_start_col=0
+fi
+
+for ((row = 1; row <= banner_height; row++)); do
+  line="${banner_lines[$row]:-}"
+  banner_first_solid[$row]=-1
+  banner_last_solid[$row]=-1
+
+  for ((col = 0; col < banner_width; col++)); do
+    if (( col < ${#line} )); then
+      ch="${line[$((col + 1))]}"
+    else
+      ch=' '
+    fi
+
+    if [[ "${ch}" != ' ' ]]; then
+      banner_solid["${row},${col}"]=1
+      if (( banner_first_solid[$row] < 0 )); then
+        banner_first_solid[$row]="${col}"
+      fi
+      banner_last_solid[$row]="${col}"
+    fi
+  done
+done
+
+for ((col = 0; col < banner_width; col++)); do
+  mark_exterior_space 1 "${col}"
+  mark_exterior_space "${banner_height}" "${col}"
+done
+
+for ((row = 1; row <= banner_height; row++)); do
+  mark_exterior_space "${row}" 0
+  mark_exterior_space "${row}" "$((banner_width - 1))"
+done
+
+head=1
+while (( head <= ${#queue_rows[@]} )); do
+  row="${queue_rows[$head]}"
+  col="${queue_cols[$head]}"
+  head=$((head + 1))
+
+  mark_exterior_space "$((row - 1))" "${col}"
+  mark_exterior_space "$((row + 1))" "${col}"
+  mark_exterior_space "${row}" "$((col - 1))"
+  mark_exterior_space "${row}" "$((col + 1))"
+done
+
+for ((row = 1; row <= banner_height; row++)); do
+  for ((col = 0; col < banner_width; col++)); do
+    key="${row},${col}"
+    if (( ! ${+banner_solid[$key]} && ! ${+banner_exterior[$key]} )); then
+      banner_fill[$key]=1
+    fi
+  done
+done
+
+for ((row = 1; row <= banner_height; row++)); do
+  first_solid=-1
+  last_solid=-1
+
+  for ((col = 0; col < banner_width; col++)); do
+    key="${row},${col}"
+    if (( ${+banner_solid[$key]} )); then
+      if (( first_solid < 0 )); then
+        first_solid="${col}"
+      fi
+      last_solid="${col}"
+    fi
+  done
+
+  if (( first_solid >= 0 )); then
+    for ((col = first_solid; col <= last_solid; col++)); do
+      key="${row},${col}"
+      if (( ! ${+banner_solid[$key]} )); then
+        banner_fill[$key]=1
+      fi
+    done
+  fi
+done
+
+{
+  for ((i = 1; i <= canvas_height; i++)); do
+    banner_row=$((i - banner_start_row + 1))
+    if (( banner_row >= 1 && banner_row <= banner_height )); then
+      overlay_banner_row "${logo_lines[$i]:-}" "${banner_row}" "${banner_lines[$banner_row]:-}"
+    else
+      printf '%s\n' "${logo_lines[$i]:-}"
+    fi
+  done
+} >"${composed_logo}"
+
+"${real_fastfetch}" --logo-type file-raw --logo "${composed_logo}"

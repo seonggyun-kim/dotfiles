@@ -13,6 +13,7 @@ Usage: ./install.sh [--dry-run]
 Symlink managed dotfiles from this repo into your home directory.
 Existing files are moved to ~/.dotfiles-backups/<timestamp>/ before linking.
 Tmux plugins are installed automatically when git and tmux are available.
+Figlet is installed automatically when a supported package manager is available.
 EOF
 }
 
@@ -75,6 +76,52 @@ ensure_file() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+run_root() {
+  if [[ "${EUID}" -eq 0 ]]; then
+    run "$@"
+  elif command_exists sudo; then
+    run sudo "$@"
+  else
+    return 1
+  fi
+}
+
+install_figlet() {
+  if command_exists figlet; then
+    printf 'already installed: figlet\n'
+    return 0
+  fi
+
+  if command_exists apt-get; then
+    if run_root apt-get update && run_root apt-get install -y figlet; then
+      printf 'installed: figlet\n'
+    else
+      printf 'figlet install skipped: root or sudo is required\n' >&2
+    fi
+    return 0
+  fi
+
+  if command_exists pacman; then
+    if run_root pacman -S --needed --noconfirm figlet; then
+      printf 'installed: figlet\n'
+    else
+      printf 'figlet install skipped: root or sudo is required\n' >&2
+    fi
+    return 0
+  fi
+
+  if command_exists brew; then
+    if run brew install figlet; then
+      printf 'installed: figlet\n'
+    else
+      printf 'figlet install skipped: brew install failed\n' >&2
+    fi
+    return 0
+  fi
+
+  printf 'figlet install skipped: apt-get, pacman, or brew is required\n' >&2
 }
 
 tmux_plugin_root() {
@@ -200,6 +247,7 @@ done
 managed_paths=(
   ".zshrc"
   ".XCompose"
+  ".local/bin/dotfiles-fastfetch"
   ".config/alacritty"
   ".config/fastfetch"
   ".config/fontconfig"
@@ -218,6 +266,7 @@ link_path "${HOME_DIR}/.config/tmux/tmux.conf" "${HOME_DIR}/.tmux.conf"
 # Keep personal compose sequences in a local untracked file.
 ensure_file "${HOME_DIR}/.XCompose.local"
 
+install_figlet
 install_tmux_plugins
 
 if [[ -d "${BACKUP_DIR}" ]]; then

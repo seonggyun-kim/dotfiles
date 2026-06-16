@@ -5,6 +5,7 @@ Personal dotfiles managed from a single repo under `~/dotfiles`.
 ## Currently managed
 
 - `.zshrc`
+- `.local/bin/dotfiles-fastfetch`
 - `.config/nvim`
 - `.config/tmux/tmux.conf`
 - `.config/alacritty`
@@ -33,6 +34,8 @@ The installer creates symlinks into `$HOME` and backs up existing files to:
 `~/.dotfiles-backups/<timestamp>/`
 
 It also installs the tmux plugins declared in `.config/tmux/tmux.conf` through TPM when `git` and `tmux` are available. The CPU/MEM status plugin needs `python3`, `python3-venv`, and network access to install its Python dependency.
+
+It installs `figlet` when `apt-get`, `pacman`, or `brew` is available. The interactive zsh `fastfetch` command uses the `big` font to overlay a hostname banner onto the default OS logo while preserving the normal fastfetch info list config. Set `DOTFILES_FASTFETCH_FIGLET_FONT` to try a different font.
 
 ## OS compatibility
 
