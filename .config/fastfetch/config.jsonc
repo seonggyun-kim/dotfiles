@@ -3,8 +3,8 @@
   "display": {
     "separator": " ",
     "color": {
-      "keys": "#88c0d0",
-      "separator": "#D8DEE9"
+      "keys": "cyan",
+      "separator": "default"
     }
   },
   "modules": [
