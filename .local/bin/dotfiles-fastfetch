@@ -35,7 +35,7 @@ host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
 host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 figlet_font="${DOTFILES_FASTFETCH_FIGLET_FONT:-big}"
-cache_version="v2"
+cache_version="v3"
 
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
 cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
