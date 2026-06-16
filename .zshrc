@@ -77,7 +77,9 @@ alias vim=nvim
 # fi
 # # ----------------------------------
 
-fastfetch
+if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch 2>/dev/null || true
+fi
 
 # Set nvim as default editor
 export EDITOR=nvim
