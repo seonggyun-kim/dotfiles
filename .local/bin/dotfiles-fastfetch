@@ -107,6 +107,37 @@ visible_content_width() {
   printf '%s\n' "${#stripped}"
 }
 
+line_content_bounds() {
+  local stripped="$1"
+  local width="${#stripped}"
+  local start=-1
+  local end=-1
+  local idx ch
+
+  for ((idx = 1; idx <= width; idx++)); do
+    ch="${stripped[$idx]}"
+    if [[ "${ch}" != ' ' && "${ch}" != $'\t' ]]; then
+      start=$((idx - 1))
+      break
+    fi
+  done
+
+  if (( start < 0 )); then
+    printf -- '-1 -1\n'
+    return 0
+  fi
+
+  for ((idx = width; idx >= 1; idx--)); do
+    ch="${stripped[$idx]}"
+    if [[ "${ch}" != ' ' && "${ch}" != $'\t' ]]; then
+      end="${idx}"
+      break
+    fi
+  done
+
+  printf '%s %s\n' "${start}" "${end}"
+}
+
 repeat_spaces() {
   local count="$1"
 
@@ -252,10 +283,18 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
 done <"${banner_file}"
 
 logo_width=0
+typeset -a logo_centers
+logo_centers=()
 for line in "${logo_lines[@]}"; do
   line_width="$(visible_width "${line}")"
   if (( line_width > logo_width )); then
     logo_width="${line_width}"
+  fi
+
+  stripped_line="$(printf '%s' "${line}" | strip_ansi)"
+  read -r content_start content_end <<<"$(line_content_bounds "${stripped_line}")"
+  if (( content_start >= 0 )); then
+    logo_centers+=("$((content_start + content_end))")
   fi
 done
 
@@ -309,7 +348,13 @@ if (( banner_start_row < 1 )); then
   banner_start_row=1
 fi
 
-banner_start_col=$(( (logo_width - banner_width) / 2 ))
+if (( ${#logo_centers[@]} > 0 )); then
+  sorted_logo_centers=(${(on)logo_centers})
+  logo_center="${sorted_logo_centers[$(((${#sorted_logo_centers[@]} + 1) / 2))]}"
+  banner_start_col=$(( (logo_center - banner_width) / 2 ))
+else
+  banner_start_col=$(( (logo_width - banner_width) / 2 ))
+fi
 if (( banner_start_col < 0 )); then
   banner_start_col=0
 fi
