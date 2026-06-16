@@ -31,6 +31,8 @@ The installer creates symlinks into `$HOME` and backs up existing files to:
 
 `~/.dotfiles-backups/<timestamp>/`
 
+It also installs the tmux plugins declared in `.config/tmux/tmux.conf` through TPM when `git` and `tmux` are available. The CPU/MEM status plugin needs `python3`, `python3-venv`, and network access to install its Python dependency.
+
 ## OS compatibility
 
 - Works on Linux and macOS (requires `bash`, `ln`, `mv`, `readlink`, `mkdir`).
