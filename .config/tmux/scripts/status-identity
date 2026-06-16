@@ -3,6 +3,7 @@ set -euo pipefail
 
 normal_fg="${1:-#D8DEE9}"
 host_fg="${2:-magenta}"
+root_host_fg="${3:-colour208}"
 
 user="${USER:-}"
 if [[ -z "${user}" ]]; then
@@ -21,8 +22,15 @@ if [[ -z "${host}" ]] && [[ -r /proc/sys/kernel/hostname ]]; then
 fi
 host="${host%%.*}"
 
+raw_user="${user}"
+user_lc="$(printf '%s' "${raw_user}" | tr '[:upper:]' '[:lower:]')"
 user="$(printf '%s' "${user}" | tr '[:lower:]' '[:upper:]')"
 host="$(printf '%s' "${host}" | tr '[:lower:]' '[:upper:]')"
+
+if [[ "${user_lc}" == "root" ]]; then
+  printf '#[fg=%s,bold,nounderscore]%s' "${root_host_fg}" "${host}"
+  exit 0
+fi
 
 printf '#[fg=%s,nobold,nounderscore]%s | #[fg=%s,bold,nounderscore]%s' \
   "${normal_fg}" "${user}" "${host_fg}" "${host}"
