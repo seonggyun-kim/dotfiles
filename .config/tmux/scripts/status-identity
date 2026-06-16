@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+normal_fg="${1:-#D8DEE9}"
+host_fg="${2:-magenta}"
+
+user="${USER:-}"
+if [[ -z "${user}" ]]; then
+  user="$(id -un 2>/dev/null || true)"
+fi
+
+host="${HOSTNAME:-}"
+if [[ -z "${host}" ]] && command -v hostname >/dev/null 2>&1; then
+  host="$(hostname -s 2>/dev/null || hostname 2>/dev/null || true)"
+fi
+if [[ -z "${host}" ]]; then
+  host="$(uname -n 2>/dev/null || true)"
+fi
+if [[ -z "${host}" ]] && [[ -r /proc/sys/kernel/hostname ]]; then
+  host="$(cat /proc/sys/kernel/hostname)"
+fi
+host="${host%%.*}"
+
+user="$(printf '%s' "${user}" | tr '[:lower:]' '[:upper:]')"
+host="$(printf '%s' "${host}" | tr '[:lower:]' '[:upper:]')"
+
+printf '#[fg=%s,nobold,nounderscore]%s | #[fg=%s,bold,nounderscore]%s' \
+  "${normal_fg}" "${user}" "${host_fg}" "${host}"

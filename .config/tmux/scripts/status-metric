@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+metric="${1:-}"
+threshold="${2:-80}"
+normal_fg="${3:-#D8DEE9}"
+alert_fg="${4:-red}"
+
+case "${metric}" in
+  cpu)
+    label="CPU"
+    metric_script="cpu.py"
+    ;;
+  mem)
+    label="MEM"
+    metric_script="mem.py"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+style_normal="#[fg=${normal_fg},nobold,nounderscore]"
+style_alert="#[fg=${alert_fg},nobold,nounderscore]"
+
+plugin_root="${TMUX_PLUGIN_MANAGER_PATH:-}"
+plugin_root="${plugin_root/#\~/${HOME}}"
+plugin_root="${plugin_root/#\$HOME/${HOME}}"
+plugin_root="${plugin_root%/}"
+
+candidates=()
+if [[ -n "${plugin_root}" ]]; then
+  candidates+=("${plugin_root}/tmux-cpu-mem-monitor")
+fi
+candidates+=(
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/tmux/plugins/tmux-cpu-mem-monitor"
+  "${HOME}/.tmux/plugins/tmux-cpu-mem-monitor"
+)
+
+plugin_dir=""
+for candidate in "${candidates[@]}"; do
+  if [[ -f "${candidate}/src/${metric_script}" ]]; then
+    plugin_dir="${candidate}"
+    break
+  fi
+done
+
+print_missing() {
+  printf '%s%s --' "${style_normal}" "${label}"
+}
+
+if [[ -z "${plugin_dir}" ]]; then
+  print_missing
+  exit 0
+fi
+
+python="${plugin_dir}/venv/bin/python"
+if [[ ! -x "${python}" ]]; then
+  python="$(command -v python3 || true)"
+fi
+
+if [[ -z "${python}" ]]; then
+  print_missing
+  exit 0
+fi
+
+value="$("${python}" "${plugin_dir}/src/${metric_script}" 2>/dev/null | tr -d '\r\n' || true)"
+if [[ -z "${value}" ]]; then
+  print_missing
+  exit 0
+fi
+
+percent="${value%%%}"
+if awk -v value="${percent}" -v threshold="${threshold}" 'BEGIN { exit !(value + 0 >= threshold + 0) }'; then
+  printf '%s%s%s %s' "${style_alert}" "${label}" "${style_normal}" "${value}"
+else
+  printf '%s%s %s' "${style_normal}" "${label}" "${value}"
+fi

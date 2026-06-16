@@ -33,3 +33,5 @@
 !.config/nvim/lua/plugins/*.lua
 !.config/tmux/
 !.config/tmux/tmux.conf
+!.config/tmux/scripts/
+!.config/tmux/scripts/*

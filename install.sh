@@ -204,6 +204,7 @@ managed_paths=(
   ".config/fontconfig"
   ".config/nvim"
   ".config/tmux/tmux.conf"
+  ".config/tmux/scripts"
 )
 
 for relative_path in "${managed_paths[@]}"; do
