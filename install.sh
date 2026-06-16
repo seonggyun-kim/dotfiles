@@ -201,6 +201,7 @@ managed_paths=(
   ".zshrc"
   ".XCompose"
   ".config/alacritty"
+  ".config/fastfetch"
   ".config/fontconfig"
   ".config/nvim"
   ".config/tmux/tmux.conf"

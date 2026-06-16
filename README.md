@@ -8,6 +8,7 @@ Personal dotfiles managed from a single repo under `~/dotfiles`.
 - `.config/nvim`
 - `.config/tmux/tmux.conf`
 - `.config/alacritty`
+- `.config/fastfetch`
 - `.config/fontconfig`
 - `.XCompose`
 
