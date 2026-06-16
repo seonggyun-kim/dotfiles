@@ -41,7 +41,7 @@ host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 
 figlet_font="big"
-cache_version="v19"
+cache_version="v20"
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
 cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
 cache_file="${cache_dir}/${cache_key}.logo"
@@ -179,8 +179,8 @@ sub marker_for_color {
   return 0 if $fg eq '';
 
   if (!exists $seen->{$fg}) {
-    $seen->{$fg} = $$next_ref <= 9 ? $$next_ref : 9;
-    $$next_ref++ if $$next_ref < 9;
+    $seen->{$fg} = $$next_ref <= 8 ? $$next_ref : 8;
+    $$next_ref++ if $$next_ref < 8;
   }
 
   return $seen->{$fg};
@@ -294,7 +294,7 @@ sub overlay_banner {
 
     for (my $col = $first_col; $col <= $last_col; $col++) {
       my $char = $col < length($line) ? substr($line, $col, 1) : ' ';
-      my $marker = $char =~ /[ \t]/ ? 0 : 1;
+      my $marker = $char =~ /[ \t]/ ? 0 : 9;
       $logo_ref->[$top + $row][$left + $col] = [$char, $marker];
     }
   }
