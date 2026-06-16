@@ -81,9 +81,54 @@ if command -v fastfetch >/dev/null 2>&1; then
     fastfetch 2>/dev/null || true
 fi
 
+ssh() {
+  TERM=xterm-256color command ssh "$@"
+}
+
 # Set nvim as default editor
 export EDITOR=nvim
 export VISUAL=nvim
+
+export PAGER='less'
+export LESS='-R -i -F -X -M'
+
+setopt prompt_subst
+autoload -Uz add-zsh-hook
+
+dotfiles_git_prompt_status() {
+  command git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+
+  local branch dirty
+  branch="$(command git symbolic-ref --quiet --short HEAD 2>/dev/null \
+    || command git rev-parse --short HEAD 2>/dev/null)" || return 0
+
+  [[ -n "$(command git status --porcelain 2>/dev/null)" ]] && dirty=" *"
+  printf '%s%s' "${branch//\%/%%}" "${dirty}"
+}
+
+dotfiles_prompt_precmd() {
+  local prompt_user prompt_host left_width git_status terminal_width gap_width gap
+
+  [[ -n "${DOTFILES_DISABLE_PROMPT:-}" ]] && return 0
+
+  prompt_user="${(%):-%n}"
+  prompt_host="${(%):-%m}"
+  left_width=$(( ${#prompt_user} + 1 + ${#prompt_host} ))
+  git_status="$(dotfiles_git_prompt_status)"
+  terminal_width="${COLUMNS:-80}"
+  (( terminal_width > 0 )) || terminal_width=80
+
+  if [[ -n "${git_status}" ]]; then
+    gap_width=$(( terminal_width - left_width - ${#git_status} ))
+    (( gap_width < 1 )) && gap_width=1
+    gap="${(pl:${gap_width}:: :)}"
+    PROMPT="%B%n@%F{#88c0d0}%m%f%b${gap}${git_status}"$'\n'"%# "
+  else
+    PROMPT="%B%n@%F{#88c0d0}%m%f%b"$'\n'"%# "
+  fi
+}
+
+add-zsh-hook precmd dotfiles_prompt_precmd
 
 # Optional machine-local overrides (not tracked in git).
 [ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
