@@ -61,9 +61,13 @@ host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
 host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 
-figlet_font="auto"
-figlet_fonts=(big small mini term)
-cache_version="v21"
+if [[ "${host_name}" == *-* ]]; then
+  figlet_font="small"
+else
+  figlet_font="big"
+fi
+
+cache_version="v23"
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
 cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
 cache_file="${cache_dir}/${cache_key}.logo"
@@ -98,6 +102,7 @@ temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-fastfetch.XXXXXX")"
 logo_config="${temp_dir}/logo.jsonc"
 logo_file="${temp_dir}/logo.txt"
 banner_file="${temp_dir}/banner.txt"
+banner_input="${temp_dir}/banner-input.txt"
 composed_logo="${temp_dir}/composed.logo"
 
 cat >"${logo_config}" <<'EOF'
@@ -121,54 +126,15 @@ if [[ ! -s "${logo_file}" ]]; then
   exit $?
 fi
 
-measure_text_width() {
-  perl -0ne '
-    s/\e\][^\a]*(?:\a|\e\\)//gs;
-    s/\e\[[0-9;?]*[ -\/]*[@-~]//gs;
-    s/\x9b[0-9;?]*[ -\/]*[@-~]//gs;
-    s/\e[ -\/]*[@-~]//gs;
-    s/\r//g;
-
-    my $width = 0;
-    for my $line (split /\n/) {
-      $line =~ s/[ \t]+$//;
-      $width = length($line) if length($line) > $width;
-    }
-    print "$width\n";
-  ' "$1"
-}
-
-logo_width="$(measure_text_width "${logo_file}")"
-(( logo_width > 0 )) || logo_width=80
+banner_text=${host_name//-/$'\n'}
+printf '%s\n' "${banner_text}" >"${banner_input}"
 
 if (( $+commands[figlet] )); then
-  best_banner_font=''
-  best_banner_width=0
-
-  for candidate_font in "${figlet_fonts[@]}"; do
-    candidate_banner="${temp_dir}/banner-${candidate_font}.txt"
-    if ! figlet -f "${candidate_font}" "${host_name}" >"${candidate_banner}" 2>/dev/null; then
-      continue
-    fi
-
-    candidate_width="$(measure_text_width "${candidate_banner}")"
-    if [[ -z "${best_banner_font}" || "${candidate_width}" -lt "${best_banner_width}" ]]; then
-      cp "${candidate_banner}" "${banner_file}"
-      best_banner_font="${candidate_font}"
-      best_banner_width="${candidate_width}"
-    fi
-
-    if (( candidate_width <= logo_width )); then
-      cp "${candidate_banner}" "${banner_file}"
-      break
-    fi
-  done
-
-  if [[ -z "${best_banner_font}" ]]; then
-    printf '%s\n' "${host_name}" >"${banner_file}"
+  if ! figlet -f "${figlet_font}" <"${banner_input}" >"${banner_file}" 2>/dev/null; then
+    figlet <"${banner_input}" >"${banner_file}"
   fi
 else
-  printf '%s\n' "${host_name}" >"${banner_file}"
+  cp "${banner_input}" "${banner_file}"
 fi
 
 if ! perl - "${logo_file}" "${banner_file}" "${composed_logo}" <<'PERL'
@@ -314,6 +280,7 @@ sub load_banner {
 
   shift @lines while @lines && $lines[0] !~ /[^ \t]/;
   pop @lines while @lines && $lines[-1] !~ /[^ \t]/;
+  @lines = grep { /[^ \t]/ } @lines;
   return ('') if !@lines;
 
   my ($global_first, $global_last);
@@ -325,8 +292,12 @@ sub load_banner {
   }
 
   return ('') if !defined $global_first;
+  my $width = $global_last - $global_first + 1;
+
   return map {
-    substr($_, $global_first, $global_last - $global_first + 1);
+    my $line = substr($_, $global_first, $width);
+    $line .= ' ' x ($width - length($line));
+    $line;
   } @lines;
 }
 
@@ -353,14 +324,44 @@ sub banner_width {
   return $width;
 }
 
+sub shift_grid_right {
+  my ($rows_ref, $amount) = @_;
+  return if $amount <= 0;
+
+  for my $row (@{$rows_ref}) {
+    next if !defined $row;
+
+    my @shifted;
+    for (my $col = 0; $col <= $#{$row}; $col++) {
+      $shifted[$col + $amount] = $row->[$col] if defined $row->[$col];
+    }
+
+    @{$row} = @shifted;
+  }
+}
+
+sub shift_grid_down {
+  my ($rows_ref, $amount) = @_;
+  return if $amount <= 0;
+
+  unshift @{$rows_ref}, map { [] } 1 .. $amount;
+}
+
 sub overlay_banner {
   my ($logo_ref, $banner_ref, $left, $top) = @_;
+  my $horizontal_padding = 2;
 
   for (my $row = 0; $row < @{$banner_ref}; $row++) {
     my $line = $banner_ref->[$row] // '';
-    next if $line !~ /[^ \t]/;
+    my ($first_col, $last_col) = line_visible_bounds($line);
+    next if !defined $first_col;
 
-    for (my $col = 0; $col < length($line); $col++) {
+    $first_col -= $horizontal_padding;
+    $last_col += $horizontal_padding;
+    $first_col = 0 if $first_col < 0;
+    $last_col = length($line) - 1 if $last_col >= length($line);
+
+    for (my $col = $first_col; $col <= $last_col; $col++) {
       my $char = substr($line, $col, 1);
       my $marker = $char =~ /[ \t]/ ? 0 : 8;
       $logo_ref->[$top + $row][$left + $col] = [$char, $marker];
@@ -407,16 +408,17 @@ my $logo_height = scalar @logo;
 my $banner_width = banner_width(@banner);
 my $banner_height = scalar @banner;
 
-my $banner_left = int(($logo_width - $banner_width) / 2);
-my $banner_top = int(($logo_height - $banner_height) / 2);
-$banner_left = 0 if $banner_left < 0;
-$banner_top = 0 if $banner_top < 0;
+my $canvas_width = $logo_width > $banner_width ? $logo_width : $banner_width;
+my $canvas_height = $logo_height > $banner_height ? $logo_height : $banner_height;
+my $logo_left = int(($canvas_width - $logo_width) / 2);
+my $logo_top = int(($canvas_height - $logo_height) / 2);
+my $banner_left = int(($canvas_width - $banner_width) / 2);
+my $banner_top = int(($canvas_height - $banner_height) / 2);
 
+shift_grid_right(\@logo, $logo_left);
+shift_grid_down(\@logo, $logo_top);
 overlay_banner(\@logo, \@banner, $banner_left, $banner_top);
-
-my $height = $logo_height;
-$height = $banner_top + $banner_height if $banner_top + $banner_height > $height;
-write_logo($out_path, \@logo, $height);
+write_logo($out_path, \@logo, $canvas_height);
 PERL
 then
   "${real_fastfetch}"
