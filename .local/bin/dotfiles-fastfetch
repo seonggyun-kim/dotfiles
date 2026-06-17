@@ -61,8 +61,9 @@ host_name="$(hostname -s 2>/dev/null || hostname 2>/dev/null || uname -n)"
 host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 
-figlet_font="big"
-cache_version="v20"
+figlet_font="auto"
+figlet_fonts=(big small mini term)
+cache_version="v21"
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
 cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
 cache_file="${cache_dir}/${cache_key}.logo"
@@ -84,7 +85,7 @@ fi
 run_fastfetch() {
   local exit_status
 
-  "${real_fastfetch}" --pipe false --logo-type file --logo "$1"
+  "${real_fastfetch}" --pipe false --logo-type file --logo "$1" --logo-color-8 default
   exit_status=$?
   exit "${exit_status}"
 }
@@ -120,9 +121,51 @@ if [[ ! -s "${logo_file}" ]]; then
   exit $?
 fi
 
+measure_text_width() {
+  perl -0ne '
+    s/\e\][^\a]*(?:\a|\e\\)//gs;
+    s/\e\[[0-9;?]*[ -\/]*[@-~]//gs;
+    s/\x9b[0-9;?]*[ -\/]*[@-~]//gs;
+    s/\e[ -\/]*[@-~]//gs;
+    s/\r//g;
+
+    my $width = 0;
+    for my $line (split /\n/) {
+      $line =~ s/[ \t]+$//;
+      $width = length($line) if length($line) > $width;
+    }
+    print "$width\n";
+  ' "$1"
+}
+
+logo_width="$(measure_text_width "${logo_file}")"
+(( logo_width > 0 )) || logo_width=80
+
 if (( $+commands[figlet] )); then
-  if ! figlet -f "${figlet_font}" "${host_name}" >"${banner_file}" 2>/dev/null; then
-    figlet "${host_name}" >"${banner_file}"
+  best_banner_font=''
+  best_banner_width=0
+
+  for candidate_font in "${figlet_fonts[@]}"; do
+    candidate_banner="${temp_dir}/banner-${candidate_font}.txt"
+    if ! figlet -f "${candidate_font}" "${host_name}" >"${candidate_banner}" 2>/dev/null; then
+      continue
+    fi
+
+    candidate_width="$(measure_text_width "${candidate_banner}")"
+    if [[ -z "${best_banner_font}" || "${candidate_width}" -lt "${best_banner_width}" ]]; then
+      cp "${candidate_banner}" "${banner_file}"
+      best_banner_font="${candidate_font}"
+      best_banner_width="${candidate_width}"
+    fi
+
+    if (( candidate_width <= logo_width )); then
+      cp "${candidate_banner}" "${banner_file}"
+      break
+    fi
+  done
+
+  if [[ -z "${best_banner_font}" ]]; then
+    printf '%s\n' "${host_name}" >"${banner_file}"
   fi
 else
   printf '%s\n' "${host_name}" >"${banner_file}"
@@ -208,8 +251,8 @@ sub marker_for_color {
   return 0 if $fg eq '';
 
   if (!exists $seen->{$fg}) {
-    $seen->{$fg} = $$next_ref <= 8 ? $$next_ref : 8;
-    $$next_ref++ if $$next_ref < 8;
+    $seen->{$fg} = $$next_ref <= 7 ? $$next_ref : 7;
+    $$next_ref++ if $$next_ref < 7;
   }
 
   return $seen->{$fg};
@@ -268,7 +311,6 @@ sub parse_logo {
 sub load_banner {
   my ($path) = @_;
   my @lines = split(/\n/, strip_controls(slurp($path)), -1);
-  s/[ \t]+$// for @lines;
 
   shift @lines while @lines && $lines[0] !~ /[^ \t]/;
   pop @lines while @lines && $lines[-1] !~ /[^ \t]/;
@@ -284,9 +326,7 @@ sub load_banner {
 
   return ('') if !defined $global_first;
   return map {
-    my $line = substr($_, $global_first, $global_last - $global_first + 1);
-    $line =~ s/[ \t]+$//;
-    $line;
+    substr($_, $global_first, $global_last - $global_first + 1);
   } @lines;
 }
 
@@ -318,12 +358,11 @@ sub overlay_banner {
 
   for (my $row = 0; $row < @{$banner_ref}; $row++) {
     my $line = $banner_ref->[$row] // '';
-    my ($first_col, $last_col) = line_visible_bounds($line);
-    next if !defined $first_col;
+    next if $line !~ /[^ \t]/;
 
-    for (my $col = $first_col; $col <= $last_col; $col++) {
-      my $char = $col < length($line) ? substr($line, $col, 1) : ' ';
-      my $marker = $char =~ /[ \t]/ ? 0 : 9;
+    for (my $col = 0; $col < length($line); $col++) {
+      my $char = substr($line, $col, 1);
+      my $marker = $char =~ /[ \t]/ ? 0 : 8;
       $logo_ref->[$top + $row][$left + $col] = [$char, $marker];
     }
   }
@@ -351,7 +390,7 @@ sub write_logo {
         $current_marker = $marker;
       }
 
-      print {$out} $char;
+      print {$out} $char eq '$' ? '$$' : $char;
     }
 
     print {$out} "\n";

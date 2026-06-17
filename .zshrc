@@ -123,15 +123,20 @@ dotfiles_git_prompt_status() {
 }
 
 dotfiles_prompt_precmd() {
-  local git_status
+  local git_status path_prompt
   local host_color normal_color
 
   [[ -n "${DOTFILES_DISABLE_PROMPT:-}" ]] && return 0
 
   host_color=$'%{\e[38;2;136;192;208m%}'
   normal_color=$'%{\e[39m%}'
+  if [[ "${PWD}" == "${HOME}" ]]; then
+    path_prompt=''
+  else
+    path_prompt=' %~'
+  fi
   git_status="$(dotfiles_git_prompt_status)"
-  PROMPT=$'\n'"%B%n@${host_color}%m${normal_color}%b %~${git_status}"$'\n'"%# "
+  PROMPT=$'\n'"%B%n@${host_color}%m${normal_color}%b${path_prompt}${git_status}"$'\n'"%# "
 }
 
 add-zsh-hook -d precmd dotfiles_prompt_precmd 2>/dev/null || true
