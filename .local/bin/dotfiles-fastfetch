@@ -62,12 +62,12 @@ host_name="${host_name%%.*}"
 host_name="$(printf '%s' "${host_name:-host}" | tr '[:upper:]' '[:lower:]')"
 
 if [[ "${host_name}" == *-* ]]; then
-  figlet_font="small"
+  figlet_font="smslant"
 else
-  figlet_font="big"
+  figlet_font="slant"
 fi
 
-cache_version="v23"
+cache_version="v25"
 cache_dir="${DOTFILES_FASTFETCH_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dotfiles/fastfetch}"
 cache_key="$(printf '%s-%s-%s' "${cache_version}" "${host_name}" "${figlet_font}" | tr -cs '[:alnum:]._-' '_')"
 cache_file="${cache_dir}/${cache_key}.logo"
@@ -349,17 +349,11 @@ sub shift_grid_down {
 
 sub overlay_banner {
   my ($logo_ref, $banner_ref, $left, $top) = @_;
-  my $horizontal_padding = 2;
 
   for (my $row = 0; $row < @{$banner_ref}; $row++) {
     my $line = $banner_ref->[$row] // '';
     my ($first_col, $last_col) = line_visible_bounds($line);
     next if !defined $first_col;
-
-    $first_col -= $horizontal_padding;
-    $last_col += $horizontal_padding;
-    $first_col = 0 if $first_col < 0;
-    $last_col = length($line) - 1 if $last_col >= length($line);
 
     for (my $col = $first_col; $col <= $last_col; $col++) {
       my $char = substr($line, $col, 1);
