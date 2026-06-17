@@ -53,6 +53,7 @@ fi
 alias zshconfig='nvim ~/.zshrc'
 alias nvimconfig='nvim ~/.config/nvim/init.lua'
 alias vim=nvim
+alias cf='clear && fastfetch'
 
 # Generated for envman. Do not edit.
 [ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
@@ -109,6 +110,13 @@ ssh() {
 # Set nvim as default editor
 export EDITOR=nvim
 export VISUAL=nvim
+
+# Edit the current command line in $VISUAL/$EDITOR with Ctrl-X Ctrl-E.
+autoload -Uz edit-command-line
+zle -N edit-command-line
+for keymap in emacs viins vicmd; do
+  bindkey -M "$keymap" '^X^E' edit-command-line 2>/dev/null
+done
 
 export PAGER='less'
 export LESS='-R -i -F -X -M'
