@@ -11,6 +11,9 @@
 !README.md
 !install.sh
 
+!docs/
+!docs/*.md
+
 !.local/
 !.local/bin/
 !.local/bin/dotfiles-fastfetch
@@ -40,4 +43,4 @@
 !.config/tmux/
 !.config/tmux/tmux.conf
 !.config/tmux/scripts/
-!.config/tmux/scripts/*
+!.config/tmux/scripts/status-*

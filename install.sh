@@ -251,6 +251,7 @@ managed_paths=(
   ".config/alacritty"
   ".config/fastfetch"
   ".config/fontconfig"
+  ".config/niri"
   ".config/nvim"
   ".config/tmux/tmux.conf"
   ".config/tmux/scripts"

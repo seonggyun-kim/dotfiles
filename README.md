@@ -2,61 +2,108 @@
 
 Personal dotfiles managed from a single repo under `~/dotfiles`.
 
-## Currently managed
+The installer symlinks tracked files into `$HOME`, backs up existing targets, and installs a few optional runtime dependencies when the local machine supports them.
 
-- `.zshrc`
-- `.local/bin/dotfiles-fastfetch`
-- `.config/nvim`
-- `.config/tmux/tmux.conf`
-- `.config/alacritty`
-- `.config/fastfetch`
-- `.config/fontconfig`
-- `.XCompose`
+## Quick Start
 
-`~/.zprofile` is intentionally not managed, so you can keep machine-specific login PATH/env settings local.
-
-`~/.tmux.conf` is also symlinked to `~/.config/tmux/tmux.conf` for compatibility with older tmux versions.
-
-## Install on this machine or a new machine
-
-```bash
-./install.sh
-```
-
-Preview changes first:
+Preview the install:
 
 ```bash
 ./install.sh --dry-run
 ```
 
-The installer creates symlinks into `$HOME` and backs up existing files to:
+Apply it:
 
-`~/.dotfiles-backups/<timestamp>/`
+```bash
+./install.sh
+```
 
-It also installs the tmux plugins declared in `.config/tmux/tmux.conf` through TPM when `git` and `tmux` are available. The CPU/MEM status plugin needs `python3`, `python3-venv`, and network access to install its Python dependency.
+Existing files are moved to:
 
-It installs `figlet` when `apt-get`, `pacman`, or `brew` is available. The interactive zsh `fastfetch` command uses the `big` font to overlay a hostname banner onto the default OS logo while preserving the normal fastfetch info list config. The composed logo is cached under `${XDG_CACHE_HOME:-~/.cache}/dotfiles/fastfetch`; first use builds it, normal runs reuse it, and `fastfetch --refresh-cache` rebuilds it.
+```text
+~/.dotfiles-backups/<timestamp>/
+```
 
-## OS compatibility
+## Managed Paths
 
-- Works on Linux and macOS (requires `bash`, `ln`, `mv`, `readlink`, `mkdir`).
-- On Windows, use WSL or a Unix-like shell environment.
+`install.sh` links these paths into `$HOME`:
 
-## Add another dotfile later
-
-1. Put it in this repo using the same path it should have under `$HOME`.
-2. Add the path to `managed_paths` in `install.sh`.
-3. Run `./install.sh` again.
-
-## Keep private data out of git
-
-- Put personal compose entries in `~/.XCompose.local`.
-- Put machine- or account-specific shell settings in `~/.zshrc.local` or local `~/.zprofile`.
-- These `*.local` files are ignored by git.
-
-## Good next candidates to track
-
-- `.gitconfig`
-- `.config/kitty`
+- `.zshrc`
+- `.XCompose`
+- `.local/bin/dotfiles-fastfetch`
+- `.config/alacritty`
+- `.config/fastfetch`
+- `.config/fontconfig`
 - `.config/niri`
-- `.Xresources`
+- `.config/nvim`
+- `.config/tmux/tmux.conf`
+- `.config/tmux/scripts`
+
+It also links `~/.tmux.conf` to `~/.config/tmux/tmux.conf` for compatibility with older tmux setups.
+
+## Components
+
+- Zsh: prompt, aliases, editor defaults, plugin loading, and fastfetch startup.
+- Fastfetch: wrapper that composes the OS logo with a slanted hostname banner. See [docs/fastfetch.md](docs/fastfetch.md).
+- Tmux: top status line, CPU/MEM scripts, TPM plugin setup, prefix-based pane movement. See [docs/tmux.md](docs/tmux.md).
+- Neovim: Lua config, plugins, language helpers, and pack lockfile.
+- Alacritty: terminal settings and local theme.
+- Niri: compositor config and Dank Material Shell modules/profiles.
+- Fontconfig: Korean font fallback.
+- XCompose: compose key entries, with local extension support.
+
+## Local Files
+
+Keep machine-specific and private data out of git:
+
+- `~/.zshrc.local` for local shell overrides.
+- `~/.zprofile` or `~/.zprofile.local` for machine-specific login environment.
+- `~/.XCompose.local` for private compose entries.
+
+The installer creates `~/.XCompose.local` when it is missing. `~/.zprofile` is intentionally not managed.
+
+## Dependencies
+
+Required basics:
+
+- `bash`
+- `ln`, `mv`, `mkdir`, `readlink`
+
+Optional integrations:
+
+- `zsh` for the main shell config.
+- `fastfetch` for startup system info.
+- `figlet` for the fastfetch hostname banner.
+- `tmux` and `git` for TPM plugin installation.
+- `python3` and `python3-venv` for the tmux CPU/MEM plugin dependency setup.
+
+`install.sh` attempts to install `figlet` through `apt-get`, `pacman`, or `brew` when available.
+
+## Maintenance Checks
+
+Run these before committing broad config changes:
+
+```bash
+git diff --check
+bash -n install.sh
+zsh -n .zshrc
+zsh -n .local/bin/dotfiles-fastfetch
+bash -n .config/tmux/scripts/status-metric
+bash -n .config/tmux/scripts/status-identity
+tmux source-file -n .config/tmux/tmux.conf
+./install.sh --dry-run
+```
+
+Fastfetch cache check:
+
+```bash
+~/.local/bin/dotfiles-fastfetch --refresh-cache
+```
+
+## Adding Another Dotfile
+
+1. Add the file or directory to this repo using the same path it should have under `$HOME`.
+2. Add the path to `managed_paths` in `install.sh`.
+3. Update `.gitignore` so the path is explicitly unignored.
+4. Document the new component in this README if it affects setup or maintenance.
+5. Run `./install.sh --dry-run`.
