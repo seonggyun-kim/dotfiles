@@ -89,6 +89,7 @@ bash -n install.sh
 zsh -n .zshrc
 zsh -n .local/bin/dotfiles-fastfetch
 bash -n .config/tmux/scripts/status-metric
+bash -n .config/tmux/scripts/status-battery
 bash -n .config/tmux/scripts/status-identity
 tmux source-file -n .config/tmux/tmux.conf
 ./install.sh --dry-run

@@ -14,11 +14,17 @@ The second link is for compatibility with older tmux startup behavior.
 The status bar is a single top line:
 
 - left: session name, separator, window list
-- right: CPU, MEM, separator, identity
+- right: CPU, MEM, battery when available, separator, identity
 
 CPU and MEM are rendered by:
 
 - `.config/tmux/scripts/status-metric`
+
+Battery is rendered by:
+
+- `.config/tmux/scripts/status-battery`
+
+The battery script reads Linux power-supply data, macOS `pmset`, or `acpi` when available. It prints nothing on hosts without battery information. The status line highlights it red below 20%.
 
 Identity is rendered by:
 
@@ -54,5 +60,6 @@ Check helper scripts:
 
 ```bash
 bash -n .config/tmux/scripts/status-metric
+bash -n .config/tmux/scripts/status-battery
 bash -n .config/tmux/scripts/status-identity
 ```

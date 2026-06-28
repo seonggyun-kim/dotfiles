@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+threshold="${1:-20}"
+normal_fg="${2:-#D8DEE9}"
+charging_fg="${3:-#A3BE8C}"
+alert_fg="${4:-red}"
+
+style_normal="#[fg=${normal_fg},nobold,nounderscore]"
+style_charging="#[fg=${charging_fg},nobold,nounderscore]"
+style_alert="#[fg=${alert_fg},nobold,nounderscore]"
+
+battery_percent=""
+battery_status=""
+
+read_number() {
+  local path="${1}"
+  local value=""
+
+  [[ -r "${path}" ]] || return 1
+  IFS= read -r value < "${path}" || return 1
+  [[ "${value}" =~ ^[0-9]+([.][0-9]+)?$ ]] || return 1
+
+  printf '%s' "${value}"
+}
+
+normalize_percent() {
+  local value="${1}"
+
+  awk -v value="${value}" 'BEGIN {
+    percent = value + 0
+    if (percent < 0) {
+      percent = 0
+    }
+    if (percent > 100) {
+      percent = 100
+    }
+    printf "%.0f", percent
+  }'
+}
+
+merge_status() {
+  local candidate="${1}"
+  local candidate_lc=""
+
+  [[ -n "${candidate}" ]] || return 0
+  candidate_lc="$(printf '%s' "${candidate}" | tr '[:upper:]' '[:lower:]')"
+
+  case "${candidate_lc}" in
+    charging)
+      battery_status="Charging"
+      ;;
+    discharging)
+      if [[ "${battery_status}" != "Charging" ]]; then
+        battery_status="Discharging"
+      fi
+      ;;
+    not\ charging)
+      if [[ -z "${battery_status}" || "${battery_status}" == "Full" ]]; then
+        battery_status="Not charging"
+      fi
+      ;;
+    full)
+      if [[ -z "${battery_status}" ]]; then
+        battery_status="Full"
+      fi
+      ;;
+  esac
+}
+
+read_linux_battery() {
+  local battery_dirs=()
+  local dir=""
+  local type=""
+  local name=""
+  local status=""
+  local energy_now=""
+  local energy_full=""
+  local charge_now=""
+  local charge_full=""
+  local capacity=""
+  local total_now=0
+  local total_full=0
+  local weighted_count=0
+  local capacity_sum=0
+  local capacity_count=0
+
+  [[ -d /sys/class/power_supply ]] || return 1
+
+  for dir in /sys/class/power_supply/*; do
+    [[ -d "${dir}" ]] || continue
+
+    type=""
+    if [[ -r "${dir}/type" ]]; then
+      IFS= read -r type < "${dir}/type" || type=""
+    fi
+    name="${dir##*/}"
+
+    if [[ "${type}" == "Battery" || "${name}" == BAT* ]]; then
+      battery_dirs+=("${dir}")
+    fi
+  done
+
+  (( ${#battery_dirs[@]} > 0 )) || return 1
+
+  for dir in "${battery_dirs[@]}"; do
+    if [[ -r "${dir}/status" ]]; then
+      IFS= read -r status < "${dir}/status" || status=""
+      merge_status "${status}"
+    fi
+
+    if energy_now="$(read_number "${dir}/energy_now" 2>/dev/null)" &&
+      energy_full="$(read_number "${dir}/energy_full" 2>/dev/null)" &&
+      awk -v full="${energy_full}" 'BEGIN { exit !(full + 0 > 0) }'; then
+      total_now="$(awk -v total="${total_now}" -v value="${energy_now}" 'BEGIN { printf "%.0f", total + value }')"
+      total_full="$(awk -v total="${total_full}" -v value="${energy_full}" 'BEGIN { printf "%.0f", total + value }')"
+      weighted_count=$((weighted_count + 1))
+      continue
+    fi
+
+    if charge_now="$(read_number "${dir}/charge_now" 2>/dev/null)" &&
+      charge_full="$(read_number "${dir}/charge_full" 2>/dev/null)" &&
+      awk -v full="${charge_full}" 'BEGIN { exit !(full + 0 > 0) }'; then
+      total_now="$(awk -v total="${total_now}" -v value="${charge_now}" 'BEGIN { printf "%.0f", total + value }')"
+      total_full="$(awk -v total="${total_full}" -v value="${charge_full}" 'BEGIN { printf "%.0f", total + value }')"
+      weighted_count=$((weighted_count + 1))
+      continue
+    fi
+
+    if capacity="$(read_number "${dir}/capacity" 2>/dev/null)"; then
+      capacity_sum="$(awk -v total="${capacity_sum}" -v value="${capacity}" 'BEGIN { printf "%.0f", total + value }')"
+      capacity_count=$((capacity_count + 1))
+    fi
+  done
+
+  if (( weighted_count > 0 )) && awk -v full="${total_full}" 'BEGIN { exit !(full + 0 > 0) }'; then
+    battery_percent="$(awk -v now="${total_now}" -v full="${total_full}" 'BEGIN { printf "%.0f", now / full * 100 }')"
+  elif (( capacity_count > 0 )); then
+    battery_percent="$(awk -v sum="${capacity_sum}" -v count="${capacity_count}" 'BEGIN { printf "%.0f", sum / count }')"
+  else
+    return 1
+  fi
+
+  battery_percent="$(normalize_percent "${battery_percent}")"
+}
+
+read_pmset_battery() {
+  local output=""
+  local percent=""
+  local status=""
+
+  command -v pmset >/dev/null 2>&1 || return 1
+
+  output="$(pmset -g batt 2>/dev/null || true)"
+  [[ "${output}" == *"%"* ]] || return 1
+
+  percent="$(printf '%s\n' "${output}" | awk 'match($0, /[0-9]+%/) { print substr($0, RSTART, RLENGTH - 1); exit }')"
+  [[ -n "${percent}" ]] || return 1
+
+  status="$(printf '%s\n' "${output}" | awk -F ';' '/[0-9]+%/ {
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+    print $2
+    exit
+  }')"
+
+  battery_percent="$(normalize_percent "${percent}")"
+  merge_status "${status}"
+}
+
+read_acpi_battery() {
+  local output=""
+  local percent=""
+  local status=""
+
+  command -v acpi >/dev/null 2>&1 || return 1
+
+  output="$(acpi -b 2>/dev/null || true)"
+  [[ "${output}" == *"%"* ]] || return 1
+
+  percent="$(printf '%s\n' "${output}" | awk -F '[:,%]' '
+    /Battery/ {
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[[:space:]]*[0-9]+$/) {
+          sum += $i + 0
+          count += 1
+          break
+        }
+      }
+    }
+    END {
+      if (count > 0) {
+        printf "%.0f", sum / count
+      } else {
+        exit 1
+      }
+    }')"
+  [[ -n "${percent}" ]] || return 1
+
+  status="$(printf '%s\n' "${output}" | awk -F ': |, ' '/Battery/ { print $2; exit }')"
+
+  battery_percent="$(normalize_percent "${percent}")"
+  merge_status "${status}"
+}
+
+print_battery() {
+  local status_lc=""
+  local segment_style="${style_normal}"
+  local suffix=""
+
+  [[ -n "${battery_percent}" ]] || return 0
+
+  status_lc="$(printf '%s' "${battery_status}" | tr '[:upper:]' '[:lower:]')"
+  if awk -v value="${battery_percent}" -v threshold="${threshold}" 'BEGIN { exit !(value + 0 < threshold + 0) }'; then
+    segment_style="${style_alert}"
+  elif [[ "${status_lc}" == "charging" ]]; then
+    segment_style="${style_charging}"
+    suffix="+"
+  fi
+
+  printf '%s %sBAT %s%%%s%s' "${style_normal}" "${segment_style}" "${battery_percent}" "${suffix}" "${style_normal}"
+}
+
+if read_linux_battery || read_pmset_battery || read_acpi_battery; then
+  print_battery
+fi
